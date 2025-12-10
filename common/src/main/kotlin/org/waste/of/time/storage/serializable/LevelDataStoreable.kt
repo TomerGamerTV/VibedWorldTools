@@ -196,7 +196,7 @@ class LevelDataStoreable : Storeable() {
 
     private fun NbtCompound.voidGenerator() {
         put("settings", NbtCompound().apply {
-            putByte("features", 1)
+            putByte("features", 0)
             putString("biome", "minecraft:the_void")
             put("layers", NbtList().apply {
                 add(NbtCompound().apply {
@@ -204,7 +204,9 @@ class LevelDataStoreable : Storeable() {
                     putInt("height", 1)
                 })
             })
-            put("structure_overrides", NbtList())
+            put("structures", NbtCompound().apply {
+                put("structures", NbtCompound())  // Empty structures to prevent generation
+            })
             putByte("lakes", 0)
         })
         putString("type", "minecraft:flat")
@@ -257,9 +259,11 @@ class LevelDataStoreable : Storeable() {
                     putInt("height", 1)
                 })
             })
-            put("structure_overrides", NbtList().apply {
-                add(NbtString.of("minecraft:strongholds"))
-                add(NbtString.of("minecraft:villages"))
+            put("structures", NbtCompound().apply {
+                put("structures", NbtCompound().apply {
+                    putString("minecraft:stronghold", "minecraft:stronghold")
+                    putString("minecraft:village", "minecraft:village")
+                })
             })
         })
         putString("type", "minecraft:flat")

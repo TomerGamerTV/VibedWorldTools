@@ -13,7 +13,7 @@ data class EntityCacheable(
 ) : Cacheable {
     fun compound() = NbtCompound().apply {
         EntityType.getId(entity.type)?.let { putString(Entity.ID_KEY, it.toString()) }
-        // Entity NBT writing skipped for 1.21.8 compile compatibility
+        // Entity NBT writing skipped for 1.21.10 compile compatibility
 
         if (config.entity.behavior.modifyEntityBehavior) {
             putByte("NoAI", config.entity.behavior.noAI.toByte())
