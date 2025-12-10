@@ -73,11 +73,11 @@ object Events {
     }
 
     fun onClientTickStart() {
-        if (CAPTURE_KEY.wasPressed() && mc.world != null && mc.currentScreen == null) {
+        if ((CAPTURE_KEY as net.minecraft.client.option.KeyBinding).wasPressed() && mc.world != null && mc.currentScreen == null) {
             CaptureManager.toggleCapture()
         }
 
-        if (CONFIG_KEY.wasPressed() && mc.world != null && mc.currentScreen == null) {
+        if ((CONFIG_KEY as net.minecraft.client.option.KeyBinding).wasPressed() && mc.world != null && mc.currentScreen == null) {
             mc.setScreen(ManagerScreen)
         }
 

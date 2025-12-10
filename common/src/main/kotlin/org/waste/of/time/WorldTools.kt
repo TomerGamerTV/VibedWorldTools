@@ -6,11 +6,8 @@ import me.shedaniel.autoconfig.AutoConfig
 import me.shedaniel.autoconfig.serializer.GsonConfigSerializer
 import net.minecraft.SharedConstants
 import net.minecraft.client.MinecraftClient
-import net.minecraft.client.option.KeyBinding
-import net.minecraft.client.util.InputUtil
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
-import org.lwjgl.glfw.GLFW
 import org.waste.of.time.config.WorldToolsConfig
 
 object WorldTools {
@@ -28,14 +25,10 @@ object WorldTools {
     val CREDIT_MESSAGE = "This file was created by $MOD_NAME $VERSION ($URL)"
     val CREDIT_MESSAGE_MD = "This file was created by [$MOD_NAME $VERSION]($URL)"
     val LOG: Logger = LogManager.getLogger()
-    var CAPTURE_KEY = KeyBinding(
-        "$MOD_ID.key.toggle_capture", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_F12,
-        "$MOD_ID.key.categories"
-    )
-    var CONFIG_KEY = KeyBinding(
-        "$MOD_ID.key.open_config", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_F10,
-        "$MOD_ID.key.categories"
-    )
+
+    // KeyBindings are initialized by the platform-specific module (Fabric/Forge)
+    lateinit var CAPTURE_KEY: Any
+    lateinit var CONFIG_KEY: Any
 
     val mc: MinecraftClient = MinecraftClient.getInstance()
     lateinit var config: WorldToolsConfig; private set

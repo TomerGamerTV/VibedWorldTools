@@ -19,6 +19,7 @@ import net.minecraft.world.LightType
 import net.minecraft.world.biome.BiomeKeys
 import net.minecraft.world.chunk.BelowZeroRetrogen
 import net.minecraft.world.chunk.PalettedContainer
+import net.minecraft.world.chunk.PaletteProvider
 import net.minecraft.world.chunk.SerializedChunk
 import net.minecraft.world.chunk.WorldChunk
 import net.minecraft.world.gen.chunk.BlendingData
@@ -66,12 +67,8 @@ open class RegionBasedChunk(
             dimension
         )
 
-    private val stateIdContainer = PalettedContainer.createPalettedContainerCodec(
-        Block.STATE_IDS,
-        BlockState.CODEC,
-        PalettedContainer.PaletteProvider.BLOCK_STATE,
-        Blocks.AIR.defaultState
-    )
+    // Codec for block states - temporarily using simplified approach
+    private val stateIdContainer get() = BlockState.CODEC
 
     override fun cache() {
         HotCache.chunks[chunkPos] = this
@@ -159,12 +156,8 @@ open class RegionBasedChunk(
     private fun generateSections(chunk: WorldChunk) = NbtList().apply {
         val biomeRegistry = chunk.world.registryManager.getOptional(RegistryKeys.BIOME).orElse(null) ?: return@apply
         val defaultValue = biomeRegistry.getOptional(BiomeKeys.PLAINS).orElse(null) ?: return@apply
-        val biomeCodec = PalettedContainer.createReadableContainerCodec(
-            biomeRegistry.indexedEntries,
-            biomeRegistry.entryCodec,
-            PalettedContainer.PaletteProvider.BIOME,
-            defaultValue
-        )
+        // Codec for biomes - using registry entry codec
+        val biomeCodec = biomeRegistry.entryCodec
         val lightingProvider = chunk.world.chunkManager.lightingProvider
 
         (lightingProvider.bottomY until lightingProvider.topY).forEach { y ->
@@ -189,14 +182,27 @@ open class RegionBasedChunk(
                      */
                     (chunkSection.blockStateContainer as IPalettedContainerExtension).setWTIgnoreLock(true)
                     (chunkSection.biomeContainer as IPalettedContainerExtension).setWTIgnoreLock(true)
-                    put(
-                        "block_states",
-                        stateIdContainer.encodeStart(NbtOps.INSTANCE, chunkSection.blockStateContainer).getOrThrow()
+
+                    // Serialize block states using codec
+                    val blockStateCodec = PalettedContainer.createReadableContainerCodec(
+                        BlockState.CODEC,
+                        PaletteProvider.forBlockStates(Block.STATE_IDS),
+                        Blocks.AIR.defaultState
                     )
-                    put(
-                        "biomes",
-                        biomeCodec.encodeStart(NbtOps.INSTANCE, chunkSection.biomeContainer).getOrThrow()
+                    blockStateCodec.encodeStart(NbtOps.INSTANCE, chunkSection.blockStateContainer)
+                        .resultOrPartial { error -> LOG.error("Failed to encode block states: $error") }
+                        .ifPresent { put("block_states", it) }
+
+                    // Serialize biomes using codec
+                    val biomePaletteCodec = PalettedContainer.createReadableContainerCodec(
+                        biomeCodec,
+                        PaletteProvider.forBiomes(biomeRegistry.indexedEntries),
+                        defaultValue
                     )
+                    biomePaletteCodec.encodeStart(NbtOps.INSTANCE, chunkSection.biomeContainer)
+                        .resultOrPartial { error -> LOG.error("Failed to encode biomes: $error") }
+                        .ifPresent { put("biomes", it) }
+
                     (chunkSection.blockStateContainer as IPalettedContainerExtension).setWTIgnoreLock(false)
                     (chunkSection.biomeContainer as IPalettedContainerExtension).setWTIgnoreLock(false)
                 }

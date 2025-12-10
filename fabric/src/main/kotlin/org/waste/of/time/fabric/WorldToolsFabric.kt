@@ -28,8 +28,24 @@ object WorldToolsFabric : ClientModInitializer {
     override fun onInitializeClient() {
         WorldTools.initialize()
 
-        KeyBindingHelper.registerKeyBinding(WorldTools.CAPTURE_KEY)
-        KeyBindingHelper.registerKeyBinding(WorldTools.CONFIG_KEY)
+        // Initialize and register key bindings
+        val keyCategory = net.minecraft.client.option.KeyBinding.Category.MISC
+        WorldTools.CAPTURE_KEY = KeyBindingHelper.registerKeyBinding(
+            net.minecraft.client.option.KeyBinding(
+                "${WorldTools.MOD_ID}.key.toggle_capture",
+                net.minecraft.client.util.InputUtil.Type.KEYSYM,
+                org.lwjgl.glfw.GLFW.GLFW_KEY_F12,
+                keyCategory
+            )
+        )
+        WorldTools.CONFIG_KEY = KeyBindingHelper.registerKeyBinding(
+            net.minecraft.client.option.KeyBinding(
+                "${WorldTools.MOD_ID}.key.open_config",
+                net.minecraft.client.util.InputUtil.Type.KEYSYM,
+                org.lwjgl.glfw.GLFW.GLFW_KEY_F10,
+                keyCategory
+            )
+        )
 
         ClientCommandRegistrationCallback.EVENT.register(ClientCommandRegistrationCallback { dispatcher, _ ->
             dispatcher.register()

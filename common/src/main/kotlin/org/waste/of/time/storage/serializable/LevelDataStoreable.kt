@@ -5,6 +5,7 @@ import net.minecraft.nbt.*
 import net.minecraft.text.MutableText
 import net.minecraft.util.Util
 import net.minecraft.util.WorldSavePath
+import net.minecraft.util.math.BlockPos
 import net.minecraft.world.GameRules
 import net.minecraft.world.level.storage.LevelStorage.Session
 import org.waste.of.time.Utils.toByte
@@ -89,35 +90,34 @@ class LevelDataStoreable : Storeable() {
         put("WorldGenSettings", generatorMockNbt())
         // Omit GameType for compatibility; client will infer
 
-        putInt("SpawnX", player.world.levelProperties.spawnPos.x)
-        putInt("SpawnY", player.world.levelProperties.spawnPos.y)
-        putInt("SpawnZ", player.world.levelProperties.spawnPos.z)
-        putFloat("SpawnAngle", player.world.levelProperties.spawnAngle)
-        putLong("Time", player.world.time)
-        putLong("DayTime", player.world.timeOfDay)
+        val world = player.world
+        // Use player position as spawn point
+        putInt("SpawnX", player.blockX)
+        putInt("SpawnY", player.blockY)
+        putInt("SpawnZ", player.blockZ)
+        putFloat("SpawnAngle", 0.0f)
+        putLong("Time", world.time)
+        putLong("DayTime", world.timeOfDay)
         putLong("LastPlayed", System.currentTimeMillis())
         putString("LevelName", currentLevelName)
         putInt("version", 19133)
         putInt("clearWeatherTime", 0) // not sure
         putInt("rainTime", 0) // not sure
-        putBoolean("raining", player.world.isRaining)
-        putBoolean("thundering", player.world.isThundering)
-        putBoolean("hardcore", player.server?.isHardcore ?: false)
+        putBoolean("raining", world.isRaining)
+        putBoolean("thundering", world.isThundering)
+        putBoolean("hardcore", mc.server?.isHardcore ?: false)
         putInt("thunderTime", 0) // not sure
         putBoolean("allowCommands", true) // not sure
         putBoolean("initialized", true) // not sure
 
-        // WorldBorder serialization name changed across versions; write directly to a tag and merge
-        val borderNbt = player.world.worldBorder.write()
-        when (borderNbt) {
-            is NbtCompound -> this.put("Border", borderNbt)
-        }
+        // WorldBorder serialization - skip for now as API changed
+        // this.put("Border", NbtCompound())
 
-        putByte("Difficulty", player.world.levelProperties.difficulty.id.toByte())
+        putByte("Difficulty", world.levelProperties.difficulty.id.toByte())
         putBoolean("DifficultyLocked", false) // not sure
 
         // GameRules
-        val rules = player.world?.server?.gameRules?.genGameRules() ?: NbtCompound()
+        val rules = mc.server?.gameRules?.genGameRules() ?: NbtCompound()
         put("GameRules", rules)
 
         // Minimal Player tag to spawn near captured area
@@ -132,7 +132,7 @@ class LevelDataStoreable : Storeable() {
                 add(NbtFloat.of(player.pitch))
             })
             remove("LastDeathLocation")
-            putString("Dimension", "minecraft:${player.world.registryKey.value.path}")
+            putString("Dimension", "minecraft:${world.registryKey.value.path}")
         })
 
         put("DragonFight", NbtCompound()) // not sure
