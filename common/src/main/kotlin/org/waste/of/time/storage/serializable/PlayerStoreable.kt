@@ -60,22 +60,21 @@ data class PlayerStoreable(
 
     private fun savePlayerInventory(player: PlayerEntity, playerTag: NbtCompound) {
         val inventory = player.inventory
+        val registryManager = player.world.registryManager
         val inventoryList = net.minecraft.nbt.NbtList()
-        val registryOps = player.world.registryManager.getOps(net.minecraft.nbt.NbtOps.INSTANCE)
+        val registryOps = registryManager.getOps(net.minecraft.nbt.NbtOps.INSTANCE)
 
-        // Save main inventory, armor, and offhand
+        // Save main inventory using ItemStack.OPTIONAL_CODEC for storage format
         for (i in 0 until inventory.size()) {
             val stack = inventory.getStack(i)
             if (!stack.isEmpty) {
-                // Use VALIDATED_CODEC for proper validation
-                val encoded = ItemStack.VALIDATED_CODEC.encodeStart(registryOps, stack)
-                encoded.resultOrPartial { error ->
-                    WorldTools.LOG.warn("Failed to encode item stack at slot $i: $error")
-                }.ifPresent { nbtElement ->
-                    // ItemStack codec encodes to NbtCompound
-                    val itemNbt = nbtElement as? NbtCompound ?: return@ifPresent
-                    itemNbt.putByte("Slot", i.toByte())
-                    inventoryList.add(itemNbt)
+                // Try OPTIONAL_CODEC which might produce storage format
+                val encoded = ItemStack.OPTIONAL_CODEC.encodeStart(registryOps, stack)
+                encoded.result().ifPresent { nbtElement ->
+                    if (nbtElement is NbtCompound) {
+                        nbtElement.putByte("Slot", i.toByte())
+                        inventoryList.add(nbtElement)
+                    }
                 }
             }
         }
@@ -83,27 +82,28 @@ data class PlayerStoreable(
 
         // Save enderchest
         val enderChest = player.enderChestInventory
-        val enderList = net.minecraft.nbt.NbtList()
         WorldTools.LOG.info("Saving enderchest for ${player.name.string}: size=${enderChest.size()}")
 
         var savedCount = 0
+        val enderList = net.minecraft.nbt.NbtList()
         for (i in 0 until enderChest.size()) {
             val stack = enderChest.getStack(i)
             WorldTools.LOG.info("  Slot $i: ${if (stack.isEmpty) "empty" else "${stack.count}x ${stack.item}"}")
             if (!stack.isEmpty) {
-                val encoded = ItemStack.VALIDATED_CODEC.encodeStart(registryOps, stack)
-                encoded.resultOrPartial { error ->
-                    WorldTools.LOG.warn("Failed to encode enderchest item at slot $i: $error")
-                }.ifPresent { nbtElement ->
-                    val itemNbt = nbtElement as? NbtCompound ?: return@ifPresent
-                    itemNbt.putByte("Slot", i.toByte())
-                    enderList.add(itemNbt)
-                    savedCount++
+                // Try OPTIONAL_CODEC which might produce storage format
+                val encoded = ItemStack.OPTIONAL_CODEC.encodeStart(registryOps, stack)
+                encoded.result().ifPresent { nbtElement ->
+                    if (nbtElement is NbtCompound) {
+                        nbtElement.putByte("Slot", i.toByte())
+                        enderList.add(nbtElement)
+                        savedCount++
+                    }
                 }
             }
         }
-        WorldTools.LOG.info("Saved $savedCount enderchest items to NBT")
         playerTag.put("EnderItems", enderList)
+
+        WorldTools.LOG.info("Saved $savedCount enderchest items to NBT")
     }
 
     private fun savePlayerData(player: PlayerEntity, session: Session) {
@@ -114,8 +114,9 @@ data class PlayerStoreable(
             val newPlayerFile = File.createTempFile(player.uuidAsString + "-", ".dat", playerDataDir).toPath()
             val playerTag = NbtCompound()
 
-            // Manually save all important player data
-            // Save UUID as int array (vanilla format)
+            WorldTools.LOG.info("Saving player ${player.name.string} (type: ${player.javaClass.simpleName})")
+
+            // Save base entity data manually
             val uuid = player.uuid
             playerTag.putIntArray("UUID", intArrayOf(
                 (uuid.mostSignificantBits shr 32).toInt(),
@@ -124,68 +125,168 @@ data class PlayerStoreable(
                 uuid.leastSignificantBits.toInt()
             ))
 
-            // Save player position
             playerTag.put("Pos", net.minecraft.nbt.NbtList().apply {
                 add(net.minecraft.nbt.NbtDouble.of(player.x))
                 add(net.minecraft.nbt.NbtDouble.of(player.y))
                 add(net.minecraft.nbt.NbtDouble.of(player.z))
             })
 
-            // Save player rotation
             playerTag.put("Rotation", net.minecraft.nbt.NbtList().apply {
                 add(net.minecraft.nbt.NbtFloat.of(player.yaw))
                 add(net.minecraft.nbt.NbtFloat.of(player.pitch))
             })
 
-            // Save player motion
-            val velocity = player.velocity
             playerTag.put("Motion", net.minecraft.nbt.NbtList().apply {
-                add(net.minecraft.nbt.NbtDouble.of(velocity.x))
-                add(net.minecraft.nbt.NbtDouble.of(velocity.y))
-                add(net.minecraft.nbt.NbtDouble.of(velocity.z))
+                add(net.minecraft.nbt.NbtDouble.of(player.velocity.x))
+                add(net.minecraft.nbt.NbtDouble.of(player.velocity.y))
+                add(net.minecraft.nbt.NbtDouble.of(player.velocity.z))
             })
 
-            // Save dimension
             playerTag.putString("Dimension", player.world.registryKey.value.toString())
-
-            // Save health and food
             playerTag.putFloat("Health", player.health)
             playerTag.putInt("foodLevel", player.hungerManager.foodLevel)
             playerTag.putFloat("foodSaturationLevel", player.hungerManager.saturationLevel)
-
-            // Save XP
             playerTag.putInt("XpLevel", player.experienceLevel)
             playerTag.putFloat("XpP", player.experienceProgress)
             playerTag.putInt("XpTotal", player.totalExperience)
-
-            // Save game mode - default to survival
             playerTag.putInt("playerGameType", 0)
 
-            // Save air, fire, and ground status
+            // Critical fields for Minecraft 1.21.10
+            playerTag.putInt("DataVersion", 4556) // Minecraft 1.21.10 data version
             playerTag.putShort("Air", player.air.toShort())
-            playerTag.putShort("Fire", player.fireTicks.toShort())
             playerTag.putBoolean("OnGround", player.isOnGround)
-            playerTag.putBoolean("Invulnerable", player.isInvulnerable)
-            playerTag.putInt("PortalCooldown", player.portalCooldown)
-            playerTag.putFloat("FallDistance", player.fallDistance.toFloat())
+            playerTag.putInt("SelectedItemSlot", player.inventory.selectedSlot)
+            playerTag.putShort("Fire", player.fireTicks.toShort())
+            playerTag.putFloat("fall_distance", player.fallDistance.toFloat())
 
-            // Save abilities
+            // Additional required fields from vanilla format
+            playerTag.putInt("Score", player.score)
+            playerTag.putInt("XpSeed", 0)
+            playerTag.putBoolean("seenCredits", false)
+            playerTag.putInt("PortalCooldown", player.portalCooldown)
+            playerTag.putFloat("AbsorptionAmount", player.absorptionAmount)
+            playerTag.putBoolean("Invulnerable", player.isInvulnerable)
+            playerTag.putBoolean("FallFlying", false)
+            playerTag.putShort("SleepTimer", player.sleepTimer.toShort())
+            playerTag.putInt("HurtByTimestamp", 0)
+            playerTag.putShort("DeathTime", player.deathTime.toShort())
+            playerTag.putShort("HurtTime", player.hurtTime.toShort())
+            playerTag.putFloat("foodExhaustionLevel", 0f)
+            playerTag.putInt("foodTickTimer", 0)
+            playerTag.putBoolean("ignore_fall_damage_from_current_explosion", false)
+            playerTag.putBoolean("spawn_extra_particles_on_fall", false)
+            playerTag.putInt("current_impulse_context_reset_grace_time", 0)
+
+            // Brain compound (empty but required)
+            val brain = NbtCompound()
+            val memories = NbtCompound()
+            brain.put("memories", memories)
+            playerTag.put("Brain", brain)
+
+            // Recipe book (empty but required)
+            val recipeBook = NbtCompound()
+            recipeBook.put("recipes", net.minecraft.nbt.NbtList())
+            recipeBook.put("toBeDisplayed", net.minecraft.nbt.NbtList())
+            playerTag.put("recipeBook", recipeBook)
+
+            // Warden spawn tracker
+            val wardenTracker = NbtCompound()
+            wardenTracker.putInt("warning_level", 0)
+            wardenTracker.putInt("ticks_since_last_warning", 0)
+            wardenTracker.putInt("cooldown_ticks", 0)
+            playerTag.put("warden_spawn_tracker", wardenTracker)
+
+            // Abilities with mayBuild (critical!)
             val abilities = NbtCompound()
             abilities.putBoolean("invulnerable", player.abilities.invulnerable)
             abilities.putBoolean("flying", player.abilities.flying)
             abilities.putBoolean("mayfly", player.abilities.allowFlying)
             abilities.putBoolean("instabuild", player.abilities.creativeMode)
+            abilities.putBoolean("mayBuild", true) // Critical: must be true or player can't break blocks
             abilities.putFloat("flySpeed", player.abilities.flySpeed)
             abilities.putFloat("walkSpeed", player.abilities.walkSpeed)
             playerTag.put("abilities", abilities)
 
-            // Save score
-            playerTag.putInt("Score", player.score)
-
-            // Save inventory and enderchest with our properly encoded versions
+            // Save inventory and enderchest
             savePlayerInventory(player, playerTag)
 
-            WorldTools.LOG.info("Saved player ${player.name.string} with ${playerTag.keys.size} NBT keys")
+            // Save equipment (armor and offhand) - separate from inventory
+            val equipment = NbtCompound()
+            val registryManager = player.world.registryManager
+            val registryOps = registryManager.getOps(net.minecraft.nbt.NbtOps.INSTANCE)
+
+            // Head (slot 39 in inventory)
+            val helmet = player.inventory.getStack(39)
+            if (!helmet.isEmpty) {
+                val encoded = ItemStack.OPTIONAL_CODEC.encodeStart(registryOps, helmet)
+                encoded.result().ifPresent { nbtElement ->
+                    if (nbtElement is NbtCompound) {
+                        equipment.put("head", nbtElement)
+                    }
+                }
+            }
+
+            // Feet (slot 36 in inventory)
+            val boots = player.inventory.getStack(36)
+            if (!boots.isEmpty) {
+                val encoded = ItemStack.OPTIONAL_CODEC.encodeStart(registryOps, boots)
+                encoded.result().ifPresent { nbtElement ->
+                    if (nbtElement is NbtCompound) {
+                        equipment.put("feet", nbtElement)
+                    }
+                }
+            }
+
+            // Chest (slot 38 in inventory)
+            val chestplate = player.inventory.getStack(38)
+            if (!chestplate.isEmpty) {
+                val encoded = ItemStack.OPTIONAL_CODEC.encodeStart(registryOps, chestplate)
+                encoded.result().ifPresent { nbtElement ->
+                    if (nbtElement is NbtCompound) {
+                        equipment.put("chest", nbtElement)
+                    }
+                }
+            }
+
+            // Legs (slot 37 in inventory)
+            val leggings = player.inventory.getStack(37)
+            if (!leggings.isEmpty) {
+                val encoded = ItemStack.OPTIONAL_CODEC.encodeStart(registryOps, leggings)
+                encoded.result().ifPresent { nbtElement ->
+                    if (nbtElement is NbtCompound) {
+                        equipment.put("legs", nbtElement)
+                    }
+                }
+            }
+
+            // Offhand (slot 40 in inventory)
+            val offhand = player.inventory.getStack(40)
+            if (!offhand.isEmpty) {
+                val encoded = ItemStack.OPTIONAL_CODEC.encodeStart(registryOps, offhand)
+                encoded.result().ifPresent { nbtElement ->
+                    if (nbtElement is NbtCompound) {
+                        equipment.put("offhand", nbtElement)
+                    }
+                }
+            }
+
+            playerTag.put("equipment", equipment)
+
+            WorldTools.LOG.info("Final player NBT has ${playerTag.keys.size} keys")
+
+            // Log first item structure for debugging
+            if (playerTag.contains("Inventory")) {
+                val invList = playerTag.getList("Inventory")
+                if (invList.isPresent && invList.get().size > 0) {
+                    WorldTools.LOG.info("Sample inventory item NBT: ${invList.get().get(0)}")
+                }
+            }
+            if (playerTag.contains("EnderItems")) {
+                val enderList = playerTag.getList("EnderItems")
+                if (enderList.isPresent && enderList.get().size > 0) {
+                    WorldTools.LOG.info("Sample enderchest item NBT: ${enderList.get().get(0)}")
+                }
+            }
 
             if (config.entity.censor.lastDeathLocation) {
                 playerTag.remove("LastDeathLocation")
