@@ -1,14 +1,12 @@
 package org.waste.of.time.storage.serializable
 
 import net.minecraft.entity.player.PlayerEntity
-import net.minecraft.inventory.Inventories
 import net.minecraft.item.ItemStack
 import net.minecraft.nbt.NbtCompound
 import net.minecraft.nbt.NbtIo
 import net.minecraft.text.MutableText
 import net.minecraft.util.Util
 import net.minecraft.util.WorldSavePath
-import net.minecraft.util.collection.DefaultedList
 import net.minecraft.world.level.storage.LevelStorage.Session
 import org.waste.of.time.Utils.asString
 import org.waste.of.time.WorldTools
@@ -20,8 +18,6 @@ import org.waste.of.time.storage.CustomRegionBasedStorage
 import org.waste.of.time.storage.Storeable
 import org.waste.of.time.storage.cache.HotCache
 import java.io.File
-import java.nio.file.Files
-import java.nio.file.Path
 
 data class PlayerStoreable(
     val player: PlayerEntity
@@ -59,16 +55,17 @@ data class PlayerStoreable(
     }
 
     private fun savePlayerInventory(player: PlayerEntity, playerTag: NbtCompound) {
-        val inventory = player.inventory
         val registryManager = player.world.registryManager
-        val inventoryList = net.minecraft.nbt.NbtList()
         val registryOps = registryManager.getOps(net.minecraft.nbt.NbtOps.INSTANCE)
 
-        // Save main inventory using ItemStack.OPTIONAL_CODEC for storage format
-        for (i in 0 until inventory.size()) {
-            val stack = inventory.getStack(i)
+        // Save main inventory using ItemStack.OPTIONAL_CODEC
+        // Only slots 0-35 for main inventory (hotbar 0-8, main inventory 9-35)
+        // Armor and offhand are saved separately in "equipment" compound for 1.21.5+
+        val inventoryList = net.minecraft.nbt.NbtList()
+        val mainInventorySize = 36
+        for (i in 0 until mainInventorySize) {
+            val stack = player.inventory.getStack(i)
             if (!stack.isEmpty) {
-                // Try OPTIONAL_CODEC which might produce storage format
                 val encoded = ItemStack.OPTIONAL_CODEC.encodeStart(registryOps, stack)
                 encoded.result().ifPresent { nbtElement ->
                     if (nbtElement is NbtCompound) {
@@ -80,30 +77,26 @@ data class PlayerStoreable(
         }
         playerTag.put("Inventory", inventoryList)
 
-        // Save enderchest
-        val enderChest = player.enderChestInventory
-        WorldTools.LOG.info("Saving enderchest for ${player.name.string}: size=${enderChest.size()}")
+        WorldTools.LOG.info("Saved ${inventoryList.size} main inventory items")
 
-        var savedCount = 0
+        // Save EnderChest using ItemStack.OPTIONAL_CODEC with slot information
+        val enderChest = player.enderChestInventory
         val enderList = net.minecraft.nbt.NbtList()
         for (i in 0 until enderChest.size()) {
             val stack = enderChest.getStack(i)
-            WorldTools.LOG.info("  Slot $i: ${if (stack.isEmpty) "empty" else "${stack.count}x ${stack.item}"}")
             if (!stack.isEmpty) {
-                // Try OPTIONAL_CODEC which might produce storage format
                 val encoded = ItemStack.OPTIONAL_CODEC.encodeStart(registryOps, stack)
                 encoded.result().ifPresent { nbtElement ->
                     if (nbtElement is NbtCompound) {
                         nbtElement.putByte("Slot", i.toByte())
                         enderList.add(nbtElement)
-                        savedCount++
                     }
                 }
             }
         }
         playerTag.put("EnderItems", enderList)
 
-        WorldTools.LOG.info("Saved $savedCount enderchest items to NBT")
+        WorldTools.LOG.info("Saved ${enderList.size} enderchest items")
     }
 
     private fun savePlayerData(player: PlayerEntity, session: Session) {
@@ -210,7 +203,7 @@ data class PlayerStoreable(
             // Save inventory and enderchest
             savePlayerInventory(player, playerTag)
 
-            // Save equipment (armor and offhand) - separate from inventory
+            // Save equipment (armor and offhand) - separate from inventory in 1.21.5+
             val equipment = NbtCompound()
             val registryManager = player.world.registryManager
             val registryOps = registryManager.getOps(net.minecraft.nbt.NbtOps.INSTANCE)
@@ -218,55 +211,40 @@ data class PlayerStoreable(
             // Head (slot 39 in inventory)
             val helmet = player.inventory.getStack(39)
             if (!helmet.isEmpty) {
-                val encoded = ItemStack.OPTIONAL_CODEC.encodeStart(registryOps, helmet)
-                encoded.result().ifPresent { nbtElement ->
-                    if (nbtElement is NbtCompound) {
-                        equipment.put("head", nbtElement)
-                    }
+                ItemStack.OPTIONAL_CODEC.encodeStart(registryOps, helmet).result().ifPresent {
+                    equipment.put("head", it)
                 }
             }
 
             // Feet (slot 36 in inventory)
             val boots = player.inventory.getStack(36)
             if (!boots.isEmpty) {
-                val encoded = ItemStack.OPTIONAL_CODEC.encodeStart(registryOps, boots)
-                encoded.result().ifPresent { nbtElement ->
-                    if (nbtElement is NbtCompound) {
-                        equipment.put("feet", nbtElement)
-                    }
+                ItemStack.OPTIONAL_CODEC.encodeStart(registryOps, boots).result().ifPresent {
+                    equipment.put("feet", it)
                 }
             }
 
             // Chest (slot 38 in inventory)
             val chestplate = player.inventory.getStack(38)
             if (!chestplate.isEmpty) {
-                val encoded = ItemStack.OPTIONAL_CODEC.encodeStart(registryOps, chestplate)
-                encoded.result().ifPresent { nbtElement ->
-                    if (nbtElement is NbtCompound) {
-                        equipment.put("chest", nbtElement)
-                    }
+                ItemStack.OPTIONAL_CODEC.encodeStart(registryOps, chestplate).result().ifPresent {
+                    equipment.put("chest", it)
                 }
             }
 
             // Legs (slot 37 in inventory)
             val leggings = player.inventory.getStack(37)
             if (!leggings.isEmpty) {
-                val encoded = ItemStack.OPTIONAL_CODEC.encodeStart(registryOps, leggings)
-                encoded.result().ifPresent { nbtElement ->
-                    if (nbtElement is NbtCompound) {
-                        equipment.put("legs", nbtElement)
-                    }
+                ItemStack.OPTIONAL_CODEC.encodeStart(registryOps, leggings).result().ifPresent {
+                    equipment.put("legs", it)
                 }
             }
 
             // Offhand (slot 40 in inventory)
             val offhand = player.inventory.getStack(40)
             if (!offhand.isEmpty) {
-                val encoded = ItemStack.OPTIONAL_CODEC.encodeStart(registryOps, offhand)
-                encoded.result().ifPresent { nbtElement ->
-                    if (nbtElement is NbtCompound) {
-                        equipment.put("offhand", nbtElement)
-                    }
+                ItemStack.OPTIONAL_CODEC.encodeStart(registryOps, offhand).result().ifPresent {
+                    equipment.put("offhand", it)
                 }
             }
 
