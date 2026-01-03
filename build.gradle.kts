@@ -3,7 +3,7 @@ import net.fabricmc.loom.task.RemapJarTask
 
 plugins {
     kotlin("jvm") version ("2.1.0")
-    id("architectury-plugin") version "3.4-SNAPSHOT"
+    id("architectury-plugin") version "3.4.162"
     id("dev.architectury.loom") version "1.13-SNAPSHOT" apply false
     id("com.github.johnrengelman.shadow") version "8.1.1" apply false
 }
@@ -16,7 +16,7 @@ subprojects {
     apply(plugin = "dev.architectury.loom")
     dependencies {
         "minecraft"("com.mojang:minecraft:${project.properties["minecraft_version"]!!}")
-        "mappings"("net.fabricmc:yarn:${project.properties["yarn_mappings"]}:v2")
+        "mappings"("net.fabricmc:yarn:${project.properties["yarn_mappings"]}")
     }
     if (path != ":common") {
         apply(plugin = "com.github.johnrengelman.shadow")
@@ -58,19 +58,36 @@ allprojects {
     apply(plugin = "architectury-plugin")
     apply(plugin = "maven-publish")
     apply(plugin = "org.jetbrains.kotlin.jvm")
+
+    repositories {
+        maven { url = uri("https://jitpack.io") }
+        maven {
+            name = "CottonMC"
+            url = uri("https://server.bbkr.space/artifactory/libs-release")
+        }
+        maven { url = uri("https://maven.shedaniel.me/") }
+        maven { url = uri("https://maven.terraformersmc.com/releases/") }
+        maven { url = uri("https://maven.fabricmc.net/") }
+        maven { url = uri("https://maven.architectury.dev/") }
+        mavenCentral()
+        exclusiveContent {
+            forRepository {
+                maven {
+                    name = "Modrinth"
+                    url = uri("https://api.modrinth.com/maven")
+                }
+            }
+            filter {
+                includeGroup("maven.modrinth")
+            }
+        }
+    }
+
     base.archivesName.set(project.properties["archives_base_name"]!! as String)
     group = project.properties["maven_group"]!!
     version = project.properties["mod_version"]!!
 
-    repositories {
-        maven("https://api.modrinth.com/maven")
-        maven("https://jitpack.io")
-        maven("https://server.bbkr.space/artifactory/libs-release") {
-            name = "CottonMC"
-        }
-        maven("https://maven.shedaniel.me/")
-        maven("https://maven.terraformersmc.com/releases/")
-    }
+
 
     tasks {
         compileKotlin {

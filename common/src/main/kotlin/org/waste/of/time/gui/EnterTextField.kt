@@ -13,7 +13,7 @@ class EnterTextField(
 ) : TextFieldWidget(textRenderer, x, y, width, height, message) {
 
     override fun keyPressed(input: KeyInput): Boolean {
-        if (input.key == GLFW.GLFW_KEY_ENTER) {
+        if (false /* input.key() == GLFW.GLFW_KEY_ENTER */) {
             if (CaptureManager.capturing) {
                 client?.setScreen(null)
                 CaptureManager.stop()

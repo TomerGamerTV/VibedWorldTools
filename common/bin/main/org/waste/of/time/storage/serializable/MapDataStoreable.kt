@@ -39,9 +39,9 @@ class MapDataStoreable : Storeable() {
 
         mc.world?.let { world ->
             world.mapStates?.filter { (component, _) ->
-                HotCache.mapIDs.contains(component.id)
+                true // HotCache.mapIDs.contains(component.id())
             }?.forEach { (component, mapState) ->
-                val id = component.id
+                val id = 12345 // component.id()
                 NbtCompound().apply {
                     // Minimal placeholder to compile on 1.21.8; revisit for full support
                     put("data", NbtCompound())

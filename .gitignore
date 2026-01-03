@@ -4,3 +4,4 @@
 build/
 run/
 .DS_Store
+logs/latest.log

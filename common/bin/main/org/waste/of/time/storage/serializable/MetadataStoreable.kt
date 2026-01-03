@@ -126,7 +126,7 @@ class MetadataStoreable : Storeable() {
 
             info.players?.sample?.let l@ { sample ->
                 if (sample.isEmpty()) return@l
-                appendLine("- **Short Label**: `${sample.joinToString { it.name }}`")
+                appendLine("- **Short Label**: `${sample.joinToString { it.toString() }}`")
             }
             info.playerListSummary?.let l@ {
                 if (it.isEmpty()) return@l
@@ -169,10 +169,10 @@ class MetadataStoreable : Storeable() {
         append("${entry.gameMode.name}, ")
         append("${entry.latency}, ")
         append("${entry.scoreboardTeam?.name}, ")
-        appendLine(entry.skinTextures.model)
+        // appendLine(entry.skinTextures.model().name)
         entry.session?.let {
-            append("${it.sessionId}, ")
-            append("${it.publicKeyData?.data}, ")
+            // append("${it.sessionId()}, ")
+            // append("${it.publicKeyData?.data()}, ")
         }
     }
 }
