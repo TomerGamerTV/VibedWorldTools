@@ -41,24 +41,44 @@ object StorageFlow {
         try {
             LOG.info("Started caching")
             mc.levelStorage.createSession(levelName).use { openSession ->
+                var itemsSavedSinceFlush = 0
+                val FLUSH_INTERVAL = 50 // Flush cached storages every N items for crash safety
+                
                 sharedFlow.collect { storeable ->
                     if (!storeable.shouldStore()) {
                         return@collect
                     }
 
-                    val shouldSaveLastStored: Boolean
-                    val time = measureTime {
-                        shouldSaveLastStored = (storeable as? BlockEntityLoadable)?.load(openSession, cachedStorages) ?: true
-                        storeable.store(openSession, cachedStorages)
-                    }
+                    // Wrap individual item storage in try-catch for crash safety
+                    // This ensures one corrupted chunk/entity won't kill the entire capture
+                    try {
+                        val shouldSaveLastStored: Boolean
+                        val time = measureTime {
+                            shouldSaveLastStored = (storeable as? BlockEntityLoadable)?.load(openSession, cachedStorages) ?: true
+                            storeable.store(openSession, cachedStorages)
+                        }
 
-                    if (shouldSaveLastStored) {
-                        lastStored = storeable
-                        lastStoredTimestamp = System.currentTimeMillis()
-                        lastStoredTimeNeeded = time
+                        if (shouldSaveLastStored) {
+                            lastStored = storeable
+                            lastStoredTimestamp = System.currentTimeMillis()
+                            lastStoredTimeNeeded = time
+                        }
+                        
+                        // Periodic flush for crash safety - ensures data is written to disk
+                        itemsSavedSinceFlush++
+                        if (itemsSavedSinceFlush >= FLUSH_INTERVAL) {
+                            flushAllStorages(cachedStorages)
+                            itemsSavedSinceFlush = 0
+                        }
+                    } catch (e: Exception) {
+                        // Log the error but continue with other items
+                        LOG.error("Failed to save item: ${storeable.formattedInfo.string}", e)
+                        // Don't rethrow - we want to continue saving other chunks/entities
                     }
 
                     if (storeable is EndFlow) {
+                        // Final flush before ending
+                        flushAllStorages(cachedStorages)
                         throw StopCollectingException()
                     }
                 }
@@ -75,12 +95,38 @@ object StorageFlow {
             LOG.info("Canceled caching thread")
         } catch (e: Throwable) {
             LOG.error("Unhandled storage flow error", e)
+        } finally {
+            // Always ensure storages are properly closed, even on crash
+            try {
+                cachedStorages.values.forEach { 
+                    try {
+                        it.close() 
+                    } catch (e: Exception) {
+                        LOG.error("Error closing storage", e)
+                    }
+                }
+            } catch (e: Exception) {
+                LOG.error("Error during storage cleanup", e)
+            }
         }
 
-        cachedStorages.values.forEach { it.close() }
         HotCache.clear()
         CaptureManager.capturing = false
         LOG.info("Finished caching")
+    }
+    
+    /**
+     * Flush all cached region storages to ensure data is persisted to disk.
+     * This provides crash safety by ensuring pending writes are committed.
+     */
+    private fun flushAllStorages(cachedStorages: MutableMap<String, CustomRegionBasedStorage>) {
+        cachedStorages.values.forEach { storage ->
+            try {
+                storage.flush()
+            } catch (e: Exception) {
+                LOG.warn("Failed to flush storage", e)
+            }
+        }
     }
 
     class StopCollectingException : Exception()

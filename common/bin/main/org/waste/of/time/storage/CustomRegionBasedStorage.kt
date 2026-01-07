@@ -85,6 +85,24 @@ open class CustomRegionBasedStorage internal constructor(
         }
         return result
     }
+    
+    /**
+     * Flush all cached region files to ensure pending writes are synced to disk.
+     * This does NOT close the files, allowing continued writing.
+     * Call this periodically for crash safety.
+     */
+    @Throws(IOException::class)
+    fun flush() {
+        cachedRegionFiles.values.filterNotNull().forEach { regionFile ->
+            try {
+                // RegionFile.sync() forces a flush to disk
+                regionFile.sync()
+            } catch (e: IOException) {
+                // Log but don't throw - we want to try flushing all files
+                throw e
+            }
+        }
+    }
 
     @Throws(IOException::class)
     override fun close() {

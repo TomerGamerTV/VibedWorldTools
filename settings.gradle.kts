@@ -11,8 +11,6 @@ pluginManagement {
     }
 }
 
-
-
 include("common")
 val enabled = providers.gradleProperty("enabled_platforms").orNull ?: "fabric,forge"
 val platforms = enabled.split(',').map { it.trim() }.toSet()

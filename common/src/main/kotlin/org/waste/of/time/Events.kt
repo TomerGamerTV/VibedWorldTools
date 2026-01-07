@@ -16,11 +16,15 @@ import org.waste.of.time.WorldTools.CAPTURE_KEY
 import org.waste.of.time.WorldTools.CONFIG_KEY
 import org.waste.of.time.WorldTools.config
 import org.waste.of.time.WorldTools.mc
+import org.waste.of.time.WorldTools.SCAN_KEY
 import org.waste.of.time.gui.ManagerScreen
 import org.waste.of.time.manager.BarManager.updateCapture
 import org.waste.of.time.manager.CaptureManager
 import org.waste.of.time.manager.CaptureManager.capturing
+import org.waste.of.time.manager.CaptureManager.isPaused
+import org.waste.of.time.manager.CaptureManager.isWaitingForReconnect
 import org.waste.of.time.manager.CaptureManager.currentLevelName
+import org.waste.of.time.manager.ContainerScanner
 import org.waste.of.time.manager.MessageManager
 import org.waste.of.time.manager.MessageManager.translateHighlight
 import org.waste.of.time.manager.StatisticManager
@@ -34,13 +38,13 @@ import org.waste.of.time.storage.serializable.RegionBasedChunk
 
 object Events {
     fun onChunkLoad(chunk: WorldChunk) {
-        if (!capturing) return
+        if (!capturing || isPaused) return
         RegionBasedChunk(chunk).cache()
         BlockEntityLoadable(chunk).emit()
     }
 
     fun onChunkUnload(chunk: WorldChunk) {
-        if (!capturing) return
+        if (!capturing || isPaused) return
         (HotCache.chunks[chunk.pos] ?: RegionBasedChunk(chunk)).apply {
             emit()
             flush()
@@ -48,7 +52,7 @@ object Events {
     }
 
     fun onEntityLoad(entity: Entity) {
-        if (!capturing) return
+        if (!capturing || isPaused) return
         if (entity is PlayerEntity) {
             PlayerStoreable(entity).cache()
         } else {
@@ -57,7 +61,7 @@ object Events {
     }
 
     fun onEntityUnload(entity: Entity) {
-        if (!capturing) return
+        if (!capturing || isPaused) return
         if (entity !is PlayerEntity) return
         PlayerStoreable(entity).apply {
             emit()
@@ -74,11 +78,35 @@ object Events {
             mc.setScreen(ManagerScreen)
         }
 
+        if ((SCAN_KEY as net.minecraft.client.option.KeyBinding).wasPressed() && mc.world != null && mc.currentScreen == null) {
+             if (config.general.containerScanner.enabled) {
+                 ContainerScanner.toggleScan()
+             } else {
+                 MessageManager.sendInfo("worldtools.log.info.scanner_disabled")
+             }
+        }
+
         if (!capturing) return
         updateCapture()
     }
 
     fun onClientJoin() {
+        if (isWaitingForReconnect) {
+             // Logic to check if we are on the same server is tricky because IPs can be masked or changed (proxies).
+             // But usually, if the user reconnects, they want to resume if the world matches.
+             // We can check the world name or simply ask.
+             // For now, let's assume if they are 'WaitingForReconnect' they try to reconnect to the same place.
+             // We can offer a Resume if the world levelName matches the one we were capturing.
+             if (CaptureManager.levelName == currentLevelName || CaptureManager.levelName == "Multiplayer") {
+                  CaptureManager.resumeCapture()
+             } else {
+                  // Different world?
+                   MessageManager.sendError("worldtools.log.error.resume_failed_different_world", currentLevelName, CaptureManager.levelName)
+                   CaptureManager.stop()
+             }
+             return
+        }
+        
         HotCache.clear()
         StorageFlow.lastStored = null
         StatisticManager.reset()
@@ -87,7 +115,8 @@ object Events {
 
     fun onClientDisconnect() {
         if (!capturing) return
-        CaptureManager.stop()
+        // Auto-pause and wait for reconnect
+        CaptureManager.stop(leaveWithoutStopping = true)
     }
 
     fun onInteractBlock(world: World, hitResult: BlockHitResult) {

@@ -18,14 +18,15 @@ public class GameMenuScreenMixin {
 
     @Inject(method = "initWidgets", at = @At("TAIL"))
     public void onInitWidgets(final CallbackInfo ci) {
-        GameMenuScreen self = (GameMenuScreen)(Object)this;
+        GameMenuScreen self = (GameMenuScreen) (Object) this;
         MinecraftClient client = MinecraftClient.getInstance();
         Text label = CaptureManager.INSTANCE.getCapturing()
-                ? MessageManager.INSTANCE.translateHighlight("worldtools.gui.escape.button.finish_download", CaptureManager.INSTANCE.getCurrentLevelName())
+                ? MessageManager.INSTANCE.translateHighlight("worldtools.gui.escape.button.finish_download",
+                        CaptureManager.INSTANCE.getCurrentLevelName())
                 : MessageManager.INSTANCE.getBrand();
         ButtonWidget button = ButtonWidget.builder(label, b -> {
             if (CaptureManager.INSTANCE.getCapturing()) {
-                CaptureManager.INSTANCE.stop();
+                CaptureManager.INSTANCE.stop(false);
                 client.setScreen(null);
             } else {
                 client.setScreen(ManagerScreen.INSTANCE);

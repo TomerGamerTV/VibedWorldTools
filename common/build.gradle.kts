@@ -4,7 +4,14 @@ loom {
     accessWidenerPath.set(File("src/main/resources/worldtools.accesswidener"))
 }
 
-
+repositories {
+    maven("https://maven.fabricmc.net/") {
+        name = "Fabric"
+    }
+    maven("https://jitpack.io")
+    mavenCentral()
+    mavenLocal()
+}
 
 dependencies {
     // We depend on fabric loader here to use the fabric @Environment annotations and get the mixin dependencies

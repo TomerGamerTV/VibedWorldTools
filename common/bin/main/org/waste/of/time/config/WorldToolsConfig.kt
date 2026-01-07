@@ -53,6 +53,10 @@ class WorldToolsConfig : ConfigData {
         @Tooltip
         var capture = Capture()
 
+        @CollapsibleObject(startExpanded = true)
+        @Tooltip
+        var containerScanner = ContainerScanner() // Added Scanner Config
+
         class Capture {
             var chunks = true
             var entities = true
@@ -62,6 +66,15 @@ class WorldToolsConfig : ConfigData {
             var advancements = true
             var metadata = true
             var maps = true
+        }
+
+        class ContainerScanner {
+            @Tooltip
+            var enabled = false // Master switch for manual triggering
+            @Tooltip
+            var radius = 5
+            @Tooltip
+            var delayMs = 200L // Delay between opening containers
         }
     }
 

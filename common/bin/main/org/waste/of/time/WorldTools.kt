@@ -29,6 +29,7 @@ object WorldTools {
     // KeyBindings are initialized by the platform-specific module (Fabric/Forge)
     lateinit var CAPTURE_KEY: Any
     lateinit var CONFIG_KEY: Any
+    lateinit var SCAN_KEY: Any
 
     val mc: MinecraftClient = MinecraftClient.getInstance()
     lateinit var config: WorldToolsConfig; private set

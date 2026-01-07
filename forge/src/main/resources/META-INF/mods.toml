@@ -6,7 +6,7 @@ license = "GNU General Public License v3.0"
 modId = "worldtools"
 version = "${version}"
 displayName = "WorldTools"
-authors = "Constructor, P529, rfresh2"
+authors = "Constructor, P529, rfresh2, TomerGamerTV"
 description = '''
 A powerful Minecraft mod that captures high-detail snapshots of server worlds locally.
 '''

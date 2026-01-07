@@ -46,6 +46,14 @@ object WorldToolsFabric : ClientModInitializer {
                 keyCategory
             )
         )
+        WorldTools.SCAN_KEY = KeyBindingHelper.registerKeyBinding(
+            net.minecraft.client.option.KeyBinding(
+                "${WorldTools.MOD_ID}.key.scan_containers",
+                net.minecraft.client.util.InputUtil.Type.KEYSYM,
+                org.lwjgl.glfw.GLFW.GLFW_KEY_F9,
+                keyCategory
+            )
+        )
 
         ClientCommandRegistrationCallback.EVENT.register(ClientCommandRegistrationCallback { dispatcher, _ ->
             dispatcher.register()
