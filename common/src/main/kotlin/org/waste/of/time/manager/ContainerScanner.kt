@@ -9,11 +9,18 @@ import net.minecraft.util.math.Vec3d
 import net.minecraft.world.World
 import org.waste.of.time.WorldTools.config
 import org.waste.of.time.WorldTools.mc
+import kotlin.coroutines.CoroutineContext
 
 object ContainerScanner {
     private var scanJob: Job? = null
     var isScanning = false
         private set
+
+    private val MainDispatcher = object : CoroutineDispatcher() {
+        override fun dispatch(context: CoroutineContext, block: Runnable) {
+            mc.execute(block)
+        }
+    }
 
     fun toggleScan() {
         if (isScanning) stopScan() else startScan()
@@ -47,7 +54,7 @@ object ContainerScanner {
             }
 
             // Filter containers on main thread to be safe with World access
-            val validContainers = withContext(Dispatchers.Main) {
+            val validContainers = withContext(MainDispatcher) {
                 containers.filter { pos ->
                     world.getBlockEntity(pos) is LockableContainerBlockEntity
                 }.sortedBy { it.getSquaredDistance(playerPos) }
@@ -59,7 +66,7 @@ object ContainerScanner {
                 if (!isScanning) break
                 
                 // Open container
-                withContext(Dispatchers.Main) {
+                withContext(MainDispatcher) {
                     val interactionManager = mc.interactionManager
                     if (interactionManager != null) {
                          // Simulate interaction
@@ -75,7 +82,7 @@ object ContainerScanner {
                 delay(config.general.containerScanner.delayMs)
                 
                 // Close container (ESC)
-                withContext(Dispatchers.Main) {
+                withContext(MainDispatcher) {
                     if (mc.currentScreen != null) {
                         mc.player?.closeHandledScreen()
                         mc.setScreen(null)

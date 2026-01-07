@@ -198,16 +198,27 @@ object CaptureManager {
     // I will implement `resumeExisting` as just calling start but notifying user.
     
     fun resumeExisting(levelName: String, isLegacy: Boolean = false) {
+        mc.setScreen(null)
+        
         // For legacy worlds (those without worldtools_meta.json), create a backup first
         if (isLegacy) {
-            val backupSuccess = backupWorld(levelName)
-            if (!backupSuccess) {
-                MessageManager.sendError("worldtools.log.error.backup_failed", levelName)
-                return
+            MessageManager.sendInfo("worldtools.log.info.backup_started", levelName)
+            
+            CoroutineScope(Dispatchers.IO).launch {
+                val backupSuccess = backupWorld(levelName)
+                
+                mc.execute {
+                    if (!backupSuccess) {
+                        MessageManager.sendError("worldtools.log.error.backup_failed", levelName)
+                    } else {
+                        MessageManager.sendInfo("worldtools.log.info.backup_created", levelName)
+                        start(levelName, true)
+                    }
+                }
             }
-            MessageManager.sendInfo("worldtools.log.info.backup_created", levelName)
+        } else {
+            start(levelName, true)
         }
-        start(levelName, true)
     }
     
     /**

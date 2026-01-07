@@ -163,6 +163,7 @@
   "text.autoconfig.worldtools.option.general.containerScanner.radius.@Tooltip": "Radius in blocks to search for containers.",
   "text.autoconfig.worldtools.option.general.containerScanner.delayMs": "Delay Between Opens (ms)",
   "text.autoconfig.worldtools.option.general.containerScanner.delayMs.@Tooltip": "Delay in milliseconds between opening containers. Higher values are safer on servers.",
+  "worldtools.log.info.backup_started": "Starting backup of legacy world '%s'...",
   "worldtools.log.info.backup_created": "Created backup of legacy world '%s' before resuming.",
   "worldtools.log.error.backup_failed": "Failed to create backup of '%s'. Resume aborted for safety."
 }

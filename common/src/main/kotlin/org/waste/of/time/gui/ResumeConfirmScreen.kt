@@ -46,8 +46,6 @@ class ResumeConfirmScreen(
 
     override fun render(context: DrawContext, mouseX: Int, mouseY: Int, delta: Float) {
         super.render(context, mouseX, mouseY, delta)
-        // Draw background
-        this.renderBackground(context, mouseX, mouseY, delta)
 
         // Draw title
         context.drawCenteredTextWithShadow(textRenderer, title, width / 2, height / 2 - 50, 0xFFFFFF)
